@@ -15,7 +15,6 @@ void initialize_connections()
 
 bool get_port_info(uint8_t port_id, port_t *out)
 {
-    
     udp_message_t req = {0};
     req.msg_type = MSG_GET_PORT_INFO;
     req.status = STATUS_REQUEST;
@@ -149,7 +148,10 @@ void handle_create_connection(const udp_message_t *req, udp_message_t *resp)
     const udp_create_conn_request_t *payload = (const udp_create_conn_request_t *)req->payload;
 
     // Rule 4a: Validate name length
-    size_t name_len = strlen(payload->name);
+    size_t name_len = 0;
+    while (name_len < MAX_CONN_NAME_CHARACTER && payload->name[name_len] != '\0') {
+        name_len++;
+    }
     if (name_len == 0 || name_len >= MAX_CONN_NAME_CHARACTER) {
         set_error_msg(resp, "invalid connection name length");
         return;
@@ -194,14 +196,22 @@ void handle_create_connection(const udp_message_t *req, udp_message_t *resp)
 
     // Rule 2: Query Port Manager — client port must be up
     port_t client_info = {0};
-    if (!get_port_info(payload->client_port, &client_info) || client_info.operational_state != PORT_UP) {
+    if (!get_port_info(payload->client_port, &client_info)) {
+        set_error_msg(resp, "failed to query client port status");
+        return;
+    }
+    if (client_info.operational_state != PORT_UP) {
         set_error_msg(resp, "client port is not up");
         return;
     }
 
     // Rule 2: Query Port Manager — line port must be up
     port_t line_info = {0};
-    if (!get_port_info(payload->line_port, &line_info) || line_info.operational_state != PORT_UP) {
+    if (!get_port_info(payload->line_port, &line_info)) {
+        set_error_msg(resp, "failed to query line port status");
+        return;
+    }
+    if (line_info.operational_state != PORT_UP) {
         set_error_msg(resp, "line port is not up");
         return;
     }
